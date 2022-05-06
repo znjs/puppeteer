@@ -4,16 +4,50 @@ jobs:
   lhci:
     name: Lighthouse CI
     runs-on: ubuntu-latest
+    outputs:
+      text: ${{ steps.finished.outputs.text }}
+    env:
+      VERCEL_ORG_ID: ${{secrets.VERCEL_ORG_ID}}
+      VERCEL_PROJECT_ID: ${{secrets.VERCEL_PROJECT_ID}}
+      VERCEL_TOKEN: ${{secrets.VERCEL_TOKEN}}
     steps:
-      - uses: actions/checkout@v1
-      - name: Use Node.js 16.x
-        uses: actions/setup-node@v1
+      - uses: actions/checkout@v2
+      - uses: actions/setup-node@v2
         with:
-          node-version: 16.x
-      - name: npm install
+          node-version: "14.17.0"
+      - name: Install node_modules
+        run: yarn
+      - name: build the project
+        run: yarn build
+      - name: Sets the vercel env
         run: |
-          npm install
-      - name: run Lighthouse CI
-        run: |
-          npm install -g @lhci/cli@0.3.x
-          lhci autorun --collect.url=https://node.js.org/ --upload.target=temporary-public-storage || echo "LHCI failed!"
+          cd build
+          mkdir .vercel
+          cd .vercel
+          touch project.json
+          echo "{\"orgId\":\"$VERCEL_ORG_ID,\"projectId\":\"$VERCEL_PROJECT_ID\"}" > project.json
+      - name: Deploy the project
+        run: yarn deploy
+      - name: Setup finished
+        id: finished
+        run: echo "::set-output name=text::hello-world-from-build-job"
+      # - uses: actions/checkout@v1
+      # - name: Use Node.js 16.x
+      #   uses: actions/setup-node@v1
+      #   with:
+      #     node-version: 16.x
+      # - name: npm install
+      #   run: |
+      #     npm install
+      # - name: run Lighthouse CI
+      #   run: |
+      #     npm install -g @lhci/cli@0.3.x
+      #     lhci autorun --collect.url=https://node.js.org/ --upload.target=temporary-public-storage || echo "LHCI failed!"
+      test-app:
+        needs: buildApp
+        runs-on: ubuntu-latest
+        env:
+            MY_JOB_OUT: ${{needs.buildApp.outputs.text }}
+        steps:
+            - run: echo "This is executed after the Build process"
+            - run: echo $MY_JOB_OUT
